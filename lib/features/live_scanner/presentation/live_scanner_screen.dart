@@ -1,25 +1,33 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/storage/storage_service.dart';
+import '../../../core/utils/id_extractor.dart';
 import '../../../shared/widgets/base_screen.dart';
 
 class LiveScannerScreen extends StatefulWidget {
-  const LiveScannerScreen({super.key, required this.sessionCode});
+  const LiveScannerScreen({
+    super.key,
+    required this.sessionCode,
+    this.courseId,
+  });
 
   final String sessionCode;
+  final String? courseId;
 
   @override
   State<LiveScannerScreen> createState() => _LiveScannerScreenState();
 }
 
 class _LiveScannerScreenState extends State<LiveScannerScreen> {
-  final List<String> _students = [];
   StreamSubscription<List<ScanResult>>? _scanSubscription;
+  final StorageService _storage = serviceLocator<StorageService>();
 
   @override
   void initState() {
@@ -43,7 +51,7 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
         children: [
           Row(
             children: [
-              _PulsingDot(color: Colors.red),
+              const _PulsingDot(color: Colors.red),
               const SizedBox(width: AppSpacing.sm),
               Text(
                 'Session ${widget.sessionCode}',
@@ -52,33 +60,81 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
-          Text(
-            '${_students.length} Students Recorded',
-            style: Theme.of(context).textTheme.titleMedium,
+          ValueListenableBuilder(
+            valueListenable: _storage.getSessionsListenable(),
+            builder: (context, Box<Map> box, _) {
+              final students = _storage.getSessionStudents(widget.sessionCode);
+              return Text(
+                '${students.length} Students Recorded',
+                style: Theme.of(context).textTheme.titleMedium,
+              );
+            },
           ),
           const SizedBox(height: AppSpacing.lg),
           Expanded(
-            child: ListView.separated(
-              itemCount: _students.length,
-              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-              itemBuilder: (context, index) {
-                final studentId = _students[index];
-                return Container(
-                  padding: AppSpacing.cardPadding,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: AppSpacing.borderRadiusMd,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Text(studentId),
-                    ],
-                  ),
+            child: ValueListenableBuilder(
+              valueListenable: _storage.getSessionsListenable(),
+              builder: (context, Box<Map> sessionBox, _) {
+                final students = _storage.getSessionStudents(widget.sessionCode);
+                
+                return ValueListenableBuilder(
+                  valueListenable: _storage.getRegistryListenable(),
+                  builder: (context, Box<Map> registryBox, _) {
+                    return ListView.separated(
+                      itemCount: students.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (context, index) {
+                        final id = students[index];
+                        final registryEntry = _storage.getStudentFromRegistry(id);
+                        final name = registryEntry?['name'];
+
+                        return AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 500),
+                          child: Container(
+                            key: ValueKey(name ?? id.toString()),
+                            padding: AppSpacing.cardPadding,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: AppSpacing.borderRadiusMd,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        name ?? 'New Student Detected',
+                                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                              fontWeight: name != null ? FontWeight.bold : FontWeight.normal,
+                                            ),
+                                      ),
+                                      Text(
+                                        'ID: $id',
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
                 );
               },
             ),
@@ -91,45 +147,55 @@ class _LiveScannerScreenState extends State<LiveScannerScreen> {
   void _startScan() {
     _scanSubscription = FlutterBluePlus.scanResults.listen((results) async {
       for (final result in results) {
-        final id = result.device.id.id;
-        if (_students.contains(id)) {
-          continue;
-        }
+        if (!_isValidPacket(result)) continue;
 
-        if (!_isValidPacket(result)) {
-          continue;
-        }
+        final url = _extractUrl(result);
+        if (url == null) continue;
 
-        setState(() {
-          _students.add(id);
-        });
+        final idStr = IdExtractor.extractId(url);
+        if (idStr == null) continue;
 
-        await serviceLocator<StorageService>().addSessionAttendee(
-          sessionId: widget.sessionCode,
-          studentId: id,
+        final id = int.tryParse(idStr);
+        if (id == null) continue;
+
+        final currentStudents = _storage.getSessionStudents(widget.sessionCode);
+        if (currentStudents.contains(id)) continue;
+
+        await _storage.addStudentToSession(
+          widget.sessionCode, 
+          id, 
+          courseId: widget.courseId,
         );
-
-        await _sendStopSignal(result.device);
+        HapticFeedback.lightImpact();
       }
     });
 
-    FlutterBluePlus.startScan(timeout: const Duration(minutes: 5));
+    FlutterBluePlus.startScan(
+      timeout: const Duration(minutes: 30),
+      androidUsesFineLocation: true,
+    );
+  }
+
+  String? _extractUrl(ScanResult result) {
+    if (result.advertisementData.localName.startsWith('http')) {
+      return result.advertisementData.localName;
+    }
+    
+    for (final data in result.advertisementData.serviceData.values) {
+      final decoded = String.fromCharCodes(data);
+      if (decoded.contains('id=')) return decoded;
+    }
+
+    final name = result.advertisementData.localName;
+    if (RegExp(r'^\d+$').hasMatch(name)) {
+      return 'Http://193.227.17.23/st/s.aspx?id=$name';
+    }
+
+    return null;
   }
 
   bool _isValidPacket(ScanResult result) {
-    return result.rssi > -80;
-  }
-
-  Future<void> _sendStopSignal(BluetoothDevice device) async {
-    final services = await device.discoverServices();
-    for (final service in services) {
-      for (final characteristic in service.characteristics) {
-        if (characteristic.properties.write) {
-          await characteristic.write([1], withoutResponse: true);
-          return;
-        }
-      }
-    }
+    return result.rssi > -90;
   }
 }
 

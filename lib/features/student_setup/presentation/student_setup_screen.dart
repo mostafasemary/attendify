@@ -28,6 +28,13 @@ class _StudentSetupScreenState extends State<StudentSetupScreen> {
   Widget build(BuildContext context) {
     return BaseScreen(
       title: 'Scan College ID',
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.close),
+          tooltip: 'Close',
+          onPressed: _handleClose,
+        ),
+      ],
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -75,6 +82,18 @@ class _StudentSetupScreenState extends State<StudentSetupScreen> {
       const SnackBar(content: Text('Profile registered successfully.')),
     );
     Navigator.of(context).pushReplacementNamed(AppRouter.studentBroadcaster);
+  }
+
+  Future<void> _handleClose() async {
+    await _controller.stop();
+    await serviceLocator<StorageService>().clearUserRole();
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppRouter.roleSelection,
+      (_) => false,
+    );
   }
 }
 

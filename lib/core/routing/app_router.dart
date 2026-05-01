@@ -40,14 +40,20 @@ class AppRouter {
           settings: settings,
         );
       case liveScanner:
-        final sessionCode = settings.arguments as String? ?? '00';
+        final args = settings.arguments as Map<String, dynamic>?;
+        final sessionCode = args?['code'] ?? '00';
+        final courseId = args?['courseId'];
         return MaterialPageRoute<void>(
-          builder: (_) => LiveScannerScreen(sessionCode: sessionCode),
+          builder: (_) => LiveScannerScreen(
+            sessionCode: sessionCode,
+            courseId: courseId,
+          ),
           settings: settings,
         );
       case lectureReport:
+        final courseId = settings.arguments as String? ?? '';
         return MaterialPageRoute<void>(
-          builder: (_) => const LectureReportScreen(),
+          builder: (_) => LectureReportScreen(courseId: courseId),
           settings: settings,
         );
       case home:

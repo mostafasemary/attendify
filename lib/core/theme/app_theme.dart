@@ -1,17 +1,17 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import 'app_typography.dart';
 
 class AppTheme {
-  static const Color _lightPrimary = Color(0xFF1B5E20);
-  static const Color _lightBackground = Color(0xFFF8FAF8);
+  static const Color _lightPrimary = Color(0xFF558B80);
+  static const Color _lightBackground = Color(0xFFF6F5F0);
   static const Color _lightSurface = Color(0xFFFFFFFF);
-  static const Color _lightText = Color(0xFF0F1C12);
+  static const Color _lightText = Color(0xFF1A1C1A);
 
-  static const Color _darkPrimary = Color(0xFF6BD48B);
-  static const Color _darkBackground = Color(0xFF0F1C12);
-  static const Color _darkSurface = Color(0xFF132217);
-  static const Color _darkText = Color(0xFFE7F2EA);
+  static const Color _darkPrimary = Color(0xFF86BCB1);
+  static const Color _darkBackground = Color(0xFF191C1B);
+  static const Color _darkSurface = Color(0xFF1E2120);
+  static const Color _darkText = Color(0xFFE1E3E1);
 
   static final ColorScheme _lightScheme = ColorScheme.fromSeed(
     seedColor: _lightPrimary,
@@ -47,8 +47,17 @@ class AppTheme {
         backgroundColor: scheme.background,
         foregroundColor: scheme.onBackground,
         elevation: 0,
-        surfaceTintColor: scheme.background,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         iconTheme: IconThemeData(color: scheme.onBackground),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        color: scheme.surface,
+        shadowColor: Colors.black.withOpacity(0.05),
       ),
       textTheme: AppTypography.textTheme(scheme),
     );

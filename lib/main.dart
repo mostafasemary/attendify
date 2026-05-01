@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import 'core/constants/app_constants.dart';
 import 'core/di/service_locator.dart';
@@ -7,10 +7,10 @@ import 'core/storage/storage_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   setupServiceLocator();
-  serviceLocator<StorageService>().init();
+  await serviceLocator<StorageService>().init();
   serviceLocator<ThemeController>().load();
   runApp(const AttendifyApp());
 }

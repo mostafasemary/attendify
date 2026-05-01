@@ -9,6 +9,8 @@ import '../../../shared/widgets/base_screen.dart';
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
 
+  static const String _doctorPin = '54';
+
   @override
   Widget build(BuildContext context) {
     return BaseScreen(
@@ -28,11 +30,7 @@ class RoleSelectionScreen extends StatelessWidget {
                 _RoleCard(
                   label: 'I am a Doctor',
                   icon: Icons.school,
-                  onTap: () => _selectRole(
-                    context,
-                    role: 'doctor',
-                    routeName: AppRouter.doctorDashboard,
-                  ),
+                  onTap: () => _handleDoctorAccess(context),
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 _RoleCard(
@@ -64,6 +62,89 @@ class RoleSelectionScreen extends StatelessWidget {
     Navigator.of(context).pushNamedAndRemoveUntil(
       routeName,
       (_) => false,
+    );
+  }
+
+  Future<void> _handleDoctorAccess(BuildContext context) async {
+    final controller = TextEditingController();
+    const primaryColor = Color(0xFF558B80);
+    const dialogBackground = Color(0xFF1E1E1E);
+
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: primaryColor,
+            background: dialogBackground,
+            surface: dialogBackground,
+          ),
+          dialogTheme: DialogThemeData(
+            backgroundColor: dialogBackground,
+            shape: RoundedRectangleBorder(
+              borderRadius: AppSpacing.borderRadiusLg,
+            ),
+          ),
+        ),
+        child: AlertDialog(
+          title: const Text('Doctor Access'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Enter the Doctor PIN'),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Doctor PIN',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(
+                'Cancel',
+                style: const TextStyle(color: Colors.white70),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                final enteredPin = controller.text.trim();
+                if (enteredPin != _doctorPin) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Incorrect PIN'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext, true);
+              },
+              child: Text(
+                'Continue',
+                style: const TextStyle(color: primaryColor),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    controller.dispose();
+    if (approved != true || !context.mounted) {
+      return;
+    }
+
+    await _selectRole(
+      context,
+      role: 'doctor',
+      routeName: AppRouter.doctorDashboard,
     );
   }
 }
